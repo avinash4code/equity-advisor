@@ -6,11 +6,15 @@ This is a starting skeleton, not production code. Swap the placeholder
 LLM/vectorstore/db calls for your real ones as you build.
 """
 
+import os
 from typing import TypedDict, Optional
+from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI  # swap for your LLM of choice
 import sqlite3
+
+load_dotenv()
 
 
 # ---------- Shared state ----------
@@ -22,7 +26,21 @@ class AgentState(TypedDict):
     next_step: Optional[str]    # router's decision
 
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+LLM_PROVIDER = os.environ["LLM_PROVIDER"]
+LLM_MODEL = os.environ["LLM_MODEL"]
+LLM_API_KEY = os.environ["LLM_API_KEY"]
+
+if LLM_PROVIDER == "deepseek":
+    llm = ChatOpenAI(
+        model=LLM_MODEL,
+        api_key=LLM_API_KEY,
+        base_url="https://api.deepseek.com",
+        temperature=0,
+    )
+elif LLM_PROVIDER == "openai":
+    llm = ChatOpenAI(model=LLM_MODEL, api_key=LLM_API_KEY, temperature=0)
+else:
+    raise ValueError(f"Unsupported LLM_PROVIDER: {LLM_PROVIDER}")
 
 
 # ---------- v0: Router node ----------
@@ -71,7 +89,8 @@ def sql_query_node(state: AgentState) -> dict:
     conn = sqlite3.connect("equity_research.db")
     cur = conn.cursor()
     cur.execute(
-        "SELECT pe_ratio, eps, market_cap FROM fundamentals WHERE ticker = ?",
+        "SELECT pe_ratio, eps, market_cap FROM fundamentals "
+        "WHERE ticker = ? ORDER BY as_of_date DESC LIMIT 1",
         (state["ticker"],),
     )
     row = cur.fetchone()
