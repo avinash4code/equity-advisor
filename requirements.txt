@@ -5,3 +5,6 @@ langchain-openai
 langchain-community
 chromadb
 pytest
+mcp
+langchain-mcp-adapters
+yfinance
