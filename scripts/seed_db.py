@@ -7,7 +7,7 @@ import sqlite3
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent / "equity_research.db"
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "src" / "equity_agent" / "db" / "schema.sql"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent / "src" / "db" / "schema.sql"
 
 
 def main() -> None:
@@ -16,9 +16,10 @@ def main() -> None:
     conn.executescript(SCHEMA_PATH.read_text())
 
     conn.execute(
-        "INSERT INTO fundamentals (ticker, as_of_date, pe_ratio, eps, market_cap) "
-        "VALUES (?, ?, ?, ?, ?)",
-        ("TCS.NS", "2026-09-01", 28.4, 134.2, 13650000000000),
+        "INSERT INTO fundamentals "
+        "(ticker, as_of_date, pe_ratio, eps, market_cap, roe, debt_to_equity, revenue_growth_yoy) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TCS.NS", "2026-09-01", 28.4, 134.2, 13650000000000, 0.52, 0.08, 0.061),
     )
     conn.execute(
         "INSERT INTO watchlist (ticker, added_at, notes) VALUES (?, ?, ?)",

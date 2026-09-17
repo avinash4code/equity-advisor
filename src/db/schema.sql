@@ -2,12 +2,15 @@
 -- ABOUTME: SQLite-compatible; ticker string (e.g. "TCS.NS") is the natural key throughout.
 
 CREATE TABLE fundamentals (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticker      TEXT NOT NULL,
-    as_of_date  TEXT NOT NULL,          -- ISO date; one snapshot per pull
-    pe_ratio    REAL,
-    eps         REAL,
-    market_cap  REAL,
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker              TEXT NOT NULL,
+    as_of_date          TEXT NOT NULL,          -- ISO date; one snapshot per pull
+    pe_ratio            REAL,
+    eps                 REAL,
+    market_cap          REAL,
+    roe                 REAL,
+    debt_to_equity      REAL,
+    revenue_growth_yoy  REAL,
     UNIQUE (ticker, as_of_date)
 );
 CREATE INDEX idx_fundamentals_ticker ON fundamentals (ticker, as_of_date DESC);
