@@ -32,10 +32,14 @@ def _is_stale(report_date: str, max_age_days: int = STALE_AFTER_DAYS) -> bool:
 
 def _extract_financials_from_report(text: str) -> dict:
     """Pulls the raw line items a quarterly report never states as ratios."""
-    extractor = llm.with_structured_output(_ExtractedFinancials)
+    # method="json_mode": the default json_schema response format isn't supported
+    # by the deepseek-backed LLM this project uses, and function_calling forces a
+    # tool_choice this model's thinking mode rejects.
+    extractor = llm.with_structured_output(_ExtractedFinancials, method="json_mode")
     result = extractor.invoke(
-        f"Extract net income, revenue, prior-year revenue (same quarter, if stated), "
-        f"total equity, total debt, and basic EPS from this quarterly report. "
+        "Extract these figures from the quarterly report below and respond with a "
+        "JSON object with exactly these keys: net_income, revenue, revenue_prior_year "
+        "(same quarter, one year back), total_equity, total_debt, eps (basic EPS). "
         f"Use null for any figure not stated.\n\n{text}"
     )
     return result.model_dump()
