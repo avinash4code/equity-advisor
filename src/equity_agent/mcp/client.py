@@ -23,7 +23,10 @@ async def _call_tool_async(tool_name: str, ticker: str) -> dict:
     tool = next(t for t in tools if t.name == tool_name)
     content_blocks = await tool.ainvoke({"ticker": ticker})
     text = next(block["text"] for block in content_blocks if block["type"] == "text")
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"MCP tool {tool_name!r} for {ticker!r} returned non-JSON: {text}") from e
 
 
 def fetch_live_financials(ticker: str) -> dict:

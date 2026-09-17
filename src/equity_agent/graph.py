@@ -12,6 +12,7 @@ import sqlite3
 
 from equity_agent.state import AgentState
 from equity_agent.llm import llm
+from equity_agent.nodes.fundamentals_analyst import fundamentals_analyst_node
 
 
 # ---------- v0: Router node ----------
@@ -91,21 +92,25 @@ graph = StateGraph(AgentState)
 
 graph.add_node("router", router_node)
 graph.add_node("rag_retrieve", rag_retrieve_node)
+graph.add_node("fundamentals_analyst", fundamentals_analyst_node)
 graph.add_node("sql_query", sql_query_node)
 graph.add_node("reasoning", reasoning_node)
 
 graph.set_entry_point("router")
 
-# Conditional edge: router's decision determines which branch runs
+# Conditional edge: router's decision determines which branch runs. The "sql"
+# branch goes through fundamentals_analyst first so sql_query reads freshly
+# refreshed data rather than whatever's already in the table.
 graph.add_conditional_edges(
     "router",
     route_decision,
     {
         "rag": "rag_retrieve",
-        "sql": "sql_query",
+        "sql": "fundamentals_analyst",
     },
 )
 
+graph.add_edge("fundamentals_analyst", "sql_query")
 graph.add_edge("rag_retrieve", "reasoning")
 graph.add_edge("sql_query", "reasoning")
 graph.add_edge("reasoning", END)
