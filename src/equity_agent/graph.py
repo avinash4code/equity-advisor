@@ -6,33 +6,12 @@ This is a starting skeleton, not production code. Swap the placeholder
 LLM/vectorstore/db calls for your real ones as you build.
 """
 
-import os
-from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain_openai import ChatOpenAI  # swap for your LLM of choice
 import sqlite3
 
 from equity_agent.state import AgentState
-
-load_dotenv()
-
-
-LLM_PROVIDER = os.environ["LLM_PROVIDER"]
-LLM_MODEL = os.environ["LLM_MODEL"]
-LLM_API_KEY = os.environ["LLM_API_KEY"]
-
-if LLM_PROVIDER == "deepseek":
-    llm = ChatOpenAI(
-        model=LLM_MODEL,
-        api_key=LLM_API_KEY,
-        base_url="https://api.deepseek.com",
-        temperature=0,
-    )
-elif LLM_PROVIDER == "openai":
-    llm = ChatOpenAI(model=LLM_MODEL, api_key=LLM_API_KEY, temperature=0)
-else:
-    raise ValueError(f"Unsupported LLM_PROVIDER: {LLM_PROVIDER}")
+from equity_agent.llm import llm
 
 
 # ---------- v0: Router node ----------

@@ -17,10 +17,10 @@ _CONNECTIONS = {
 }
 
 
-async def _fetch_live_financials_async(ticker: str) -> dict:
+async def _call_tool_async(tool_name: str, ticker: str) -> dict:
     client = MultiServerMCPClient(_CONNECTIONS)
     tools = await client.get_tools(server_name="market_data")
-    tool = next(t for t in tools if t.name == "get_quarterly_financials")
+    tool = next(t for t in tools if t.name == tool_name)
     content_blocks = await tool.ainvoke({"ticker": ticker})
     text = next(block["text"] for block in content_blocks if block["type"] == "text")
     return json.loads(text)
@@ -28,4 +28,9 @@ async def _fetch_live_financials_async(ticker: str) -> dict:
 
 def fetch_live_financials(ticker: str) -> dict:
     """Synchronous wrapper -- LangGraph node functions in this project are sync."""
-    return asyncio.run(_fetch_live_financials_async(ticker))
+    return asyncio.run(_call_tool_async("get_quarterly_financials", ticker))
+
+
+def fetch_live_price(ticker: str) -> dict:
+    """Lightweight current price + shares outstanding, independent of report freshness."""
+    return asyncio.run(_call_tool_async("get_price", ticker))

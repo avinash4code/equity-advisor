@@ -63,5 +63,16 @@ def get_quarterly_financials(ticker: str) -> dict:
     }
 
 
+@mcp.tool()
+def get_price(ticker: str) -> dict:
+    """Current price and shares outstanding for `ticker` -- independent of report freshness."""
+    t = yf.Ticker(ticker)
+    return {
+        "price": t.fast_info.last_price,
+        "shares_outstanding": t.fast_info.shares,
+        "as_of_date": datetime.date.today().isoformat(),
+    }
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
