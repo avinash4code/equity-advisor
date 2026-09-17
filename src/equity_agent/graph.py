@@ -7,23 +7,15 @@ LLM/vectorstore/db calls for your real ones as you build.
 """
 
 import os
-from typing import TypedDict, Optional
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI  # swap for your LLM of choice
 import sqlite3
 
+from equity_agent.state import AgentState
+
 load_dotenv()
-
-
-# ---------- Shared state ----------
-class AgentState(TypedDict):
-    ticker: str
-    messages: list[BaseMessage]
-    retrieved_docs: list[str]   # populated from v1 onward
-    sql_results: dict           # populated from v2 onward
-    next_step: Optional[str]    # router's decision
 
 
 LLM_PROVIDER = os.environ["LLM_PROVIDER"]
@@ -150,6 +142,7 @@ if __name__ == "__main__":
             "messages": [HumanMessage(content="Research TCS")],
             "retrieved_docs": [],
             "sql_results": {},
+            "fundamentals": {},
             "next_step": None,
         }
     )
