@@ -7,13 +7,13 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from equity_agent.config import STALE_AFTER_DAYS
 from equity_agent.llm import llm
 from equity_agent.mcp.client import fetch_live_financials, fetch_live_price
 from equity_agent.rag.retriever import get_latest_quarterly_report
 from equity_agent.state import AgentState
 
 DB_PATH = Path(__file__).resolve().parent.parent.parent.parent / "equity_research.db"
-STALE_AFTER_DAYS = 100
 
 
 class _ExtractedFinancials(BaseModel):
