@@ -19,6 +19,7 @@ class AgentState(TypedDict):
     aggregated_signal: dict     # populated by signal_aggregator node
     confidence: float           # populated by signal_aggregator node
     verdict: Literal["flag", "no_action", "need_more_data"]  # populated by trade_analyst node
+    trade_decision: dict        # populated by trade_analyst node
     in_portfolio: bool          # populated by portfolio_check node
     holding: Optional[dict]     # populated by existing_holding node
     invest_amount: Optional[float]  # populated by new_investment node
