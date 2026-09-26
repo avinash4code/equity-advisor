@@ -42,3 +42,17 @@ CREATE TABLE verdicts (
     created_at  TEXT NOT NULL
 );
 CREATE INDEX idx_verdicts_ticker ON verdicts (ticker, created_at DESC);
+
+-- cached output of the macro/sector/competition analyst nodes' cache-aware fetch;
+-- one shared table (kind-tagged) rather than three near-identical ones
+CREATE TABLE signals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker      TEXT NOT NULL,
+    kind        TEXT NOT NULL CHECK (kind IN ('macro', 'sector', 'competition')),
+    as_of_date  TEXT NOT NULL,
+    summary     TEXT NOT NULL,
+    score       REAL,                  -- -1..1 direction/strength; NULL if not applicable
+    confidence  REAL NOT NULL,
+    UNIQUE (ticker, kind, as_of_date)
+);
+CREATE INDEX idx_signals_ticker_kind ON signals (ticker, kind, as_of_date DESC);

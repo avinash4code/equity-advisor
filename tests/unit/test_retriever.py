@@ -1,8 +1,8 @@
-# ABOUTME: Unit tests for get_latest_quarterly_report against a mocked Chroma vectorstore.
+# ABOUTME: Unit tests for get_latest_document/get_latest_quarterly_report against a mocked Chroma vectorstore.
 
 from unittest.mock import MagicMock
 
-from equity_agent.rag.retriever import get_latest_quarterly_report
+from equity_agent.rag.retriever import get_latest_document, get_latest_quarterly_report
 
 
 def _mock_store(matches: dict) -> MagicMock:
@@ -43,3 +43,24 @@ def test_filters_on_ticker_and_doc_type():
     where_arg = store.get.call_args.kwargs["where"]
     assert {"ticker": {"$eq": "TCS.NS"}} in where_arg["$and"]
     assert {"doc_type": {"$eq": "quarterly_report"}} in where_arg["$and"]
+
+
+def test_get_latest_document_filters_on_arbitrary_doc_type():
+    store = _mock_store(
+        {
+            "ids": ["a"],
+            "documents": ["macro note text"],
+            "metadatas": [
+                {"ticker": "TCS.NS", "doc_type": "macro_note",
+                 "report_period": "2026-Q2", "report_date": "2026-07-15"},
+            ],
+        }
+    )
+    result = get_latest_document("TCS.NS", "macro_note", vectorstore=store)
+    where_arg = store.get.call_args.kwargs["where"]
+    assert {"doc_type": {"$eq": "macro_note"}} in where_arg["$and"]
+    assert result == {
+        "text": "macro note text",
+        "report_period": "2026-Q2",
+        "report_date": "2026-07-15",
+    }

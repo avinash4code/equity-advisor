@@ -15,8 +15,8 @@ def _get_vectorstore() -> Chroma:
     )
 
 
-def get_latest_quarterly_report(ticker: str, vectorstore: Chroma | None = None) -> dict | None:
-    """Returns the most recent quarterly report doc for `ticker`, or None if none is indexed.
+def get_latest_document(ticker: str, doc_type: str, vectorstore: Chroma | None = None) -> dict | None:
+    """Returns the most recent indexed doc for `ticker`/`doc_type`, or None if none is indexed.
 
     Result shape: {"text": str, "report_period": str, "report_date": str}.
     """
@@ -25,7 +25,7 @@ def get_latest_quarterly_report(ticker: str, vectorstore: Chroma | None = None) 
         where={
             "$and": [
                 {"ticker": {"$eq": ticker}},
-                {"doc_type": {"$eq": "quarterly_report"}},
+                {"doc_type": {"$eq": doc_type}},
             ]
         },
         include=["documents", "metadatas"],
@@ -41,3 +41,7 @@ def get_latest_quarterly_report(ticker: str, vectorstore: Chroma | None = None) 
         "report_period": metadatas[latest_idx]["report_period"],
         "report_date": metadatas[latest_idx]["report_date"],
     }
+
+
+def get_latest_quarterly_report(ticker: str, vectorstore: Chroma | None = None) -> dict | None:
+    return get_latest_document(ticker, "quarterly_report", vectorstore=vectorstore)
