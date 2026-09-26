@@ -1,119 +1,70 @@
 """
-LangGraph sketch: Indian equity research co-pilot
-Stages: v0 (router -> reasoning) -> v1 (+ RAG) -> v2 (+ SQL)
+LangGraph: Indian equity research co-pilot.
 
-This is a starting skeleton, not production code. Swap the placeholder
-LLM/vectorstore/db calls for your real ones as you build.
+START fans out to four parallel analysts (fundamentals, macro, sector,
+competition), which join into signal_aggregator. A portfolio-membership
+check then branches into existing_holding or new_investment, both of
+which converge into trade_analyst -> build_trade_plan -> log_and_alert.
 """
 
-from langgraph.graph import StateGraph, END
-from langchain_core.messages import HumanMessage, AIMessage
-import sqlite3
+from langchain_core.messages import HumanMessage
+from langgraph.graph import END, START, StateGraph
 
-from equity_agent.state import AgentState
-from equity_agent.llm import llm
+from equity_agent.nodes.build_trade_plan import build_trade_plan_node
+from equity_agent.nodes.competition_analyst import competition_analyst_node
+from equity_agent.nodes.existing_holding import existing_holding_node
 from equity_agent.nodes.fundamentals_analyst import fundamentals_analyst_node
+from equity_agent.nodes.log_and_alert import log_and_alert_node
+from equity_agent.nodes.macro_analyst import macro_analyst_node
+from equity_agent.nodes.new_investment import new_investment_node
+from equity_agent.nodes.portfolio_check import portfolio_check_node
+from equity_agent.nodes.sector_analyst import sector_analyst_node
+from equity_agent.nodes.signal_aggregator import signal_aggregator_node
+from equity_agent.nodes.trade_analyst import trade_analyst_node
+from equity_agent.state import AgentState
 
 
-# ---------- v0: Router node ----------
-def router_node(state: AgentState) -> dict:
-    """Decides which data source(s) are needed for this query.
-
-    v0/v1/v2 keep this simple: pick ONE branch. From v4 onward (once
-    the live-data/MCP node exists too) you'll want this to return a
-    list and fan out to multiple branches instead of picking just one.
-    """
-    prompt = f"""You are triaging a stock research request for {state['ticker']}.
-Decide which single tool to call first. Respond with exactly one word:
-"rag" or "sql".
-"""
-    response = llm.invoke(prompt)
-    decision = "sql" if "sql" in response.content.lower() else "rag"
-    return {
-        "next_step": decision,
-        "messages": state["messages"] + [AIMessage(content=f"Routing to: {decision}")],
-    }
-
-
-def route_decision(state: AgentState) -> str:
+def route_portfolio_decision(state: AgentState) -> str:
     """Conditional edge function -- reads state, returns the next node's name."""
-    return state["next_step"]
-
-
-# ---------- v1: RAG retrieve node ----------
-def rag_retrieve_node(state: AgentState) -> dict:
-    """Pulls relevant chunks from embedded earnings calls / annual reports / analyst notes."""
-    from langchain_community.vectorstores import Chroma
-    from langchain_openai import OpenAIEmbeddings
-
-    vectorstore = Chroma(
-        collection_name="equity_docs",
-        embedding_function=OpenAIEmbeddings(),
-        persist_directory="./chroma_db",
-    )
-    docs = vectorstore.similarity_search(state["ticker"], k=4)
-    return {"retrieved_docs": [d.page_content for d in docs]}
-
-
-# ---------- v2: SQL query node ----------
-def sql_query_node(state: AgentState) -> dict:
-    """Looks up fundamentals / watchlist history from the RDBMS."""
-    conn = sqlite3.connect("equity_research.db")
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT pe_ratio, eps, market_cap FROM fundamentals "
-        "WHERE ticker = ? ORDER BY as_of_date DESC LIMIT 1",
-        (state["ticker"],),
-    )
-    row = cur.fetchone()
-    conn.close()
-
-    result = {"pe_ratio": row[0], "eps": row[1], "market_cap": row[2]} if row else {}
-    return {"sql_results": result}
-
-
-# ---------- Reasoning node ----------
-def reasoning_node(state: AgentState) -> dict:
-    """v0: just echoes the routing decision. v1/v2: synthesizes whatever
-    context has been gathered so far into a summary."""
-    context = ""
-    if state.get("retrieved_docs"):
-        context += f"\nDocument excerpts: {state['retrieved_docs'][:2]}"
-    if state.get("sql_results"):
-        context += f"\nFundamentals: {state['sql_results']}"
-
-    prompt = f"Summarize findings for {state['ticker']}.{context}"
-    response = llm.invoke(prompt)
-    return {"messages": state["messages"] + [AIMessage(content=response.content)]}
+    return "existing_holding" if state["in_portfolio"] else "new_investment"
 
 
 # ---------- Graph wiring ----------
 graph = StateGraph(AgentState)
 
-graph.add_node("router", router_node)
-graph.add_node("rag_retrieve", rag_retrieve_node)
 graph.add_node("fundamentals_analyst", fundamentals_analyst_node)
-graph.add_node("sql_query", sql_query_node)
-graph.add_node("reasoning", reasoning_node)
+graph.add_node("macro_analyst", macro_analyst_node)
+graph.add_node("sector_analyst", sector_analyst_node)
+graph.add_node("competition_analyst", competition_analyst_node)
+graph.add_node("signal_aggregator", signal_aggregator_node)
+graph.add_node("portfolio_check", portfolio_check_node)
+graph.add_node("existing_holding", existing_holding_node)
+graph.add_node("new_investment", new_investment_node)
+graph.add_node("trade_analyst", trade_analyst_node)
+graph.add_node("build_trade_plan", build_trade_plan_node)
+graph.add_node("log_and_alert", log_and_alert_node)
 
-graph.set_entry_point("router")
+# Unconditional parallel fan-out: all four analysts always run.
+for analyst in ("fundamentals_analyst", "macro_analyst", "sector_analyst", "competition_analyst"):
+    graph.add_edge(START, analyst)
+    graph.add_edge(analyst, "signal_aggregator")
 
-# Conditional edge: router's decision determines which branch runs. The "sql"
-# branch goes through fundamentals_analyst first so sql_query reads freshly
-# refreshed data rather than whatever's already in the table.
+graph.add_edge("signal_aggregator", "portfolio_check")
+
 graph.add_conditional_edges(
-    "router",
-    route_decision,
+    "portfolio_check",
+    route_portfolio_decision,
     {
-        "rag": "rag_retrieve",
-        "sql": "fundamentals_analyst",
+        "existing_holding": "existing_holding",
+        "new_investment": "new_investment",
     },
 )
 
-graph.add_edge("fundamentals_analyst", "sql_query")
-graph.add_edge("rag_retrieve", "reasoning")
-graph.add_edge("sql_query", "reasoning")
-graph.add_edge("reasoning", END)
+graph.add_edge("existing_holding", "trade_analyst")
+graph.add_edge("new_investment", "trade_analyst")
+graph.add_edge("trade_analyst", "build_trade_plan")
+graph.add_edge("build_trade_plan", "log_and_alert")
+graph.add_edge("log_and_alert", END)
 
 app = graph.compile()
 
@@ -122,12 +73,8 @@ app = graph.compile()
 if __name__ == "__main__":
     result = app.invoke(
         {
-            "ticker": "TCS.NS",
-            "messages": [HumanMessage(content="Research TCS")],
-            "retrieved_docs": [],
-            "sql_results": {},
-            "fundamentals": {},
-            "next_step": None,
+            "ticker": "INFY.NS",
+            "messages": [HumanMessage(content="Research Infosys Ltd.")],
         }
     )
-    print(result["messages"][-1].content)
+    print(result["trade_plan"])
