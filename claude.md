@@ -37,19 +37,6 @@ LangGraph project: an Indian equity research co-pilot that researches a stock, c
 | `verdict` | `Literal["flag","no_action","need_more_data"]` | decision node |
 | `confidence` | `float` | reasoning node |
 
-## Incremental build plan
-
-Build in this order — each stage should run end-to-end before adding the next:
-
-| Stage | Adds | Notes |
-|---|---|---|
-| v0 | `router -> reasoning -> END`, no real tools | Proves the graph runs |
-| v1 | RAG retrieve (real vector store) | Start with a handful of manually embedded docs |
-| v2 | SQL query (real RDBMS) | Small SQLite/Postgres table: fundamentals, watchlist, portfolio |
-| v3 | Live data via MCP | Wrap existing yfinance/Tavily pipeline as an MCP server — this is the genuinely new plumbing vs. the existing stock system |
-| v4 | Router becomes a real multi-branch decision (not single-pick) | Switch from "pick one tool" to "pick a subset", ideally parallel fan-out |
-| v5 | Decision node with explicit rubric (e.g. confidence threshold) | Conditional edge on `state["verdict"]` |
-| v6 | Action nodes: log_verdict (always), send_alert (conditional) | Terminal MCP/DB write nodes |
 
 ## Folder structure
 
