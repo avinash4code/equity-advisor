@@ -2,17 +2,8 @@
 # ABOUTME: rag_retrieve_node's semantic similarity_search -- this finds the latest doc by date, not by meaning.
 
 from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
 
-from equity_agent.rag.ingest import COLLECTION_NAME, PERSIST_DIRECTORY
-
-
-def _get_vectorstore() -> Chroma:
-    return Chroma(
-        collection_name=COLLECTION_NAME,
-        embedding_function=OpenAIEmbeddings(),
-        persist_directory=PERSIST_DIRECTORY,
-    )
+from equity_agent.rag.ingest import _get_vectorstore
 
 
 def get_latest_document(ticker: str, doc_type: str, vectorstore: Chroma | None = None) -> dict | None:

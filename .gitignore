@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 equity_research.db
 .vscode/
+chroma_db/

@@ -3,6 +3,9 @@ langgraph
 langchain-core
 langchain-openai
 langchain-community
+langchain-huggingface
+sentence-transformers
+einops
 chromadb
 pytest
 mcp
