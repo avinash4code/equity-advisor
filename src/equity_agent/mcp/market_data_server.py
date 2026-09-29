@@ -18,12 +18,19 @@ def _fx_rate(from_currency: str, to_currency: str) -> float:
 
 @mcp.tool()
 def get_quarterly_financials(ticker: str) -> dict:
-    """Latest-quarter raw financials for `ticker` from yfinance.
+    """Trailing-twelve-month financials for `ticker` from yfinance, as of the latest quarter.
 
-    Returns price, shares_outstanding, eps, net_income, revenue,
-    revenue_prior_year (same quarter, one year back, or None if unavailable),
-    total_equity, total_debt (None if unavailable), and as_of_date (ISO date
-    of the latest quarter end).
+    Returns price, shares_outstanding, net_income (summed over the trailing
+    four reported quarters, or fewer if fewer are available -- this is what
+    pe_ratio/roe are conventionally computed against, not a single quarter's
+    figure), eps (net_income / shares_outstanding, not yfinance's own "Basic
+    EPS" row summed -- that row has had quarters with a NaN EPS but a present
+    Net Income, which silently undercounts a naive EPS sum), revenue,
+    revenue_prior_year (single-quarter, same
+    quarter one year back, or None if unavailable -- QoQ-YoY growth is its
+    own convention, not TTM), total_equity, total_debt (latest balance-sheet
+    snapshot, None if unavailable), and as_of_date (ISO date of the latest
+    quarter end the TTM window ends at).
 
     yfinance reports quarterly_financials/quarterly_balance_sheet in the
     company's financialCurrency, which for dual-currency tickers (e.g. an
@@ -41,6 +48,7 @@ def get_quarterly_financials(ticker: str) -> dict:
     fx_rate = _fx_rate(financial_currency, trading_currency)
 
     latest_date = quarterly_financials.columns[0]
+    trailing_cols = quarterly_financials.columns[:4]
     prior_year_date = latest_date - datetime.timedelta(days=365)
     prior_year_cols = [
         c for c in quarterly_financials.columns
@@ -68,11 +76,16 @@ def get_quarterly_financials(ticker: str) -> dict:
                 quarterly_balance_sheet.loc["Total Debt", latest_balance_date]
             ) * fx_rate
 
+    # .sum() skips NaN quarters (e.g. a missing filing) by default.
+    shares_outstanding = t.fast_info.shares
+    ttm_net_income = float(quarterly_financials.loc["Net Income", trailing_cols].sum()) * fx_rate
+    ttm_eps = ttm_net_income / shares_outstanding
+
     return {
         "price": t.fast_info.last_price,
-        "shares_outstanding": t.fast_info.shares,
-        "eps": float(quarterly_financials.loc["Basic EPS", latest_date]) * fx_rate,
-        "net_income": float(quarterly_financials.loc["Net Income", latest_date]) * fx_rate,
+        "shares_outstanding": shares_outstanding,
+        "eps": ttm_eps,
+        "net_income": ttm_net_income,
         "revenue": float(quarterly_financials.loc["Total Revenue", latest_date]) * fx_rate,
         "revenue_prior_year": revenue_prior_year,
         "total_equity": total_equity,
