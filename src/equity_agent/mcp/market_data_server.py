@@ -9,6 +9,13 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("market-data")
 
 
+def _fx_rate(from_currency: str, to_currency: str) -> float:
+    """Latest from_currency->to_currency rate, or 1.0 if they're the same currency."""
+    if from_currency == to_currency:
+        return 1.0
+    return yf.Ticker(f"{from_currency}{to_currency}=X").fast_info.last_price
+
+
 @mcp.tool()
 def get_quarterly_financials(ticker: str) -> dict:
     """Latest-quarter raw financials for `ticker` from yfinance.
@@ -17,10 +24,21 @@ def get_quarterly_financials(ticker: str) -> dict:
     revenue_prior_year (same quarter, one year back, or None if unavailable),
     total_equity, total_debt (None if unavailable), and as_of_date (ISO date
     of the latest quarter end).
+
+    yfinance reports quarterly_financials/quarterly_balance_sheet in the
+    company's financialCurrency, which for dual-currency tickers (e.g. an
+    NSE-listed, USD-reporting company) differs from fast_info's trading
+    currency that `price` is quoted in. Converting here keeps every returned
+    figure in the ticker's trading currency, so ratios computed downstream
+    (like price / eps) aren't accidentally mixing currencies.
     """
     t = yf.Ticker(ticker)
     quarterly_financials = t.quarterly_financials
     quarterly_balance_sheet = t.quarterly_balance_sheet
+
+    trading_currency = t.fast_info.currency
+    financial_currency = t.info.get("financialCurrency", trading_currency)
+    fx_rate = _fx_rate(financial_currency, trading_currency)
 
     latest_date = quarterly_financials.columns[0]
     prior_year_date = latest_date - datetime.timedelta(days=365)
@@ -29,7 +47,7 @@ def get_quarterly_financials(ticker: str) -> dict:
         if abs((c - prior_year_date).days) <= 15
     ]
     revenue_prior_year = (
-        float(quarterly_financials.loc["Total Revenue", prior_year_cols[0]])
+        float(quarterly_financials.loc["Total Revenue", prior_year_cols[0]]) * fx_rate
         if prior_year_cols
         else None
     )
@@ -44,18 +62,18 @@ def get_quarterly_financials(ticker: str) -> dict:
         if "Stockholders Equity" in quarterly_balance_sheet.index:
             total_equity = float(
                 quarterly_balance_sheet.loc["Stockholders Equity", latest_balance_date]
-            )
+            ) * fx_rate
         if "Total Debt" in quarterly_balance_sheet.index:
             total_debt = float(
                 quarterly_balance_sheet.loc["Total Debt", latest_balance_date]
-            )
+            ) * fx_rate
 
     return {
         "price": t.fast_info.last_price,
         "shares_outstanding": t.fast_info.shares,
-        "eps": float(quarterly_financials.loc["Basic EPS", latest_date]),
-        "net_income": float(quarterly_financials.loc["Net Income", latest_date]),
-        "revenue": float(quarterly_financials.loc["Total Revenue", latest_date]),
+        "eps": float(quarterly_financials.loc["Basic EPS", latest_date]) * fx_rate,
+        "net_income": float(quarterly_financials.loc["Net Income", latest_date]) * fx_rate,
+        "revenue": float(quarterly_financials.loc["Total Revenue", latest_date]) * fx_rate,
         "revenue_prior_year": revenue_prior_year,
         "total_equity": total_equity,
         "total_debt": total_debt,
