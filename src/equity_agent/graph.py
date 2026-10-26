@@ -71,10 +71,16 @@ app = graph.compile()
 
 # ---------- Run ----------
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run the equity research graph for one ticker.")
+    parser.add_argument("ticker", help='e.g. "INFY.NS"')
+    args = parser.parse_args()
+
     result = app.invoke(
         {
-            "ticker": "INFY.NS",
-            "messages": [HumanMessage(content="Research Infosys Ltd.")],
+            "ticker": args.ticker,
+            "messages": [HumanMessage(content=f"Research {args.ticker}.")],
         }
     )
     print(result["trade_plan"])
